@@ -9,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm"; -- For fuzzy search
 -- ORGANIZATIONS & USERS
 -- ============================================
 
-CREATE TABLE organizations (
+CREATE TABLE IF NOT EXISTS organizations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   type TEXT NOT NULL CHECK (type IN ('healthcare', 'law_firm', 'insurance', 'provider_network')),
@@ -20,7 +20,7 @@ CREATE TABLE organizations (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE user_profiles (
+CREATE TABLE IF NOT EXISTS user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   organization_id UUID REFERENCES organizations(id),
   email TEXT NOT NULL,
@@ -43,7 +43,7 @@ CREATE TABLE user_profiles (
 -- PATIENTS (FHIR-aligned)
 -- ============================================
 
-CREATE TABLE patients (
+CREATE TABLE IF NOT EXISTS patients (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) NOT NULL,
 
@@ -96,15 +96,15 @@ CREATE TABLE patients (
   created_by UUID REFERENCES user_profiles(id)
 );
 
-CREATE INDEX idx_patients_org ON patients(organization_id);
-CREATE INDEX idx_patients_name ON patients USING gin ((first_name || ' ' || last_name) gin_trgm_ops);
-CREATE INDEX idx_patients_mrn ON patients(mrn);
+CREATE INDEX IF NOT EXISTS idx_patients_org ON patients(organization_id);
+CREATE INDEX IF NOT EXISTS idx_patients_name ON patients USING gin ((first_name || ' ' || last_name) gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_patients_mrn ON patients(mrn);
 
 -- ============================================
 -- CASES / ENCOUNTERS
 -- ============================================
 
-CREATE TABLE cases (
+CREATE TABLE IF NOT EXISTS cases (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) NOT NULL,
   patient_id UUID REFERENCES patients(id) NOT NULL,
@@ -148,17 +148,17 @@ CREATE TABLE cases (
   created_by UUID REFERENCES user_profiles(id)
 );
 
-CREATE INDEX idx_cases_org ON cases(organization_id);
-CREATE INDEX idx_cases_patient ON cases(patient_id);
-CREATE INDEX idx_cases_status ON cases(status);
-CREATE INDEX idx_cases_assigned ON cases(assigned_to);
-CREATE UNIQUE INDEX idx_cases_number ON cases(organization_id, case_number);
+CREATE INDEX IF NOT EXISTS idx_cases_org ON cases(organization_id);
+CREATE INDEX IF NOT EXISTS idx_cases_patient ON cases(patient_id);
+CREATE INDEX IF NOT EXISTS idx_cases_status ON cases(status);
+CREATE INDEX IF NOT EXISTS idx_cases_assigned ON cases(assigned_to);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cases_number ON cases(organization_id, case_number);
 
 -- ============================================
 -- CARE TEAM
 -- ============================================
 
-CREATE TABLE care_team_members (
+CREATE TABLE IF NOT EXISTS care_team_members (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   case_id UUID REFERENCES cases(id) ON DELETE CASCADE NOT NULL,
 
@@ -188,14 +188,14 @@ CREATE TABLE care_team_members (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_care_team_case ON care_team_members(case_id);
-CREATE INDEX idx_care_team_user ON care_team_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_care_team_case ON care_team_members(case_id);
+CREATE INDEX IF NOT EXISTS idx_care_team_user ON care_team_members(user_id);
 
 -- ============================================
 -- ASSESSMENTS (FHIR QuestionnaireResponse-aligned)
 -- ============================================
 
-CREATE TABLE assessments (
+CREATE TABLE IF NOT EXISTS assessments (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) NOT NULL,
   patient_id UUID REFERENCES patients(id) NOT NULL,
@@ -231,15 +231,15 @@ CREATE TABLE assessments (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_assessments_patient ON assessments(patient_id);
-CREATE INDEX idx_assessments_case ON assessments(case_id);
-CREATE INDEX idx_assessments_type ON assessments(assessment_type);
+CREATE INDEX IF NOT EXISTS idx_assessments_patient ON assessments(patient_id);
+CREATE INDEX IF NOT EXISTS idx_assessments_case ON assessments(case_id);
+CREATE INDEX IF NOT EXISTS idx_assessments_type ON assessments(assessment_type);
 
 -- ============================================
 -- TASKS & ACTIVITIES
 -- ============================================
 
-CREATE TABLE tasks (
+CREATE TABLE IF NOT EXISTS tasks (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) NOT NULL,
   case_id UUID REFERENCES cases(id),
@@ -271,13 +271,13 @@ CREATE TABLE tasks (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_tasks_assigned ON tasks(assigned_to);
-CREATE INDEX idx_tasks_case ON tasks(case_id);
-CREATE INDEX idx_tasks_status ON tasks(status);
-CREATE INDEX idx_tasks_due ON tasks(due_date);
+CREATE INDEX IF NOT EXISTS idx_tasks_assigned ON tasks(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_tasks_case ON tasks(case_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
 
 -- Activity log (audit trail)
-CREATE TABLE activity_log (
+CREATE TABLE IF NOT EXISTS activity_log (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) NOT NULL,
 
@@ -299,16 +299,16 @@ CREATE TABLE activity_log (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_activity_org ON activity_log(organization_id);
-CREATE INDEX idx_activity_entity ON activity_log(entity_type, entity_id);
-CREATE INDEX idx_activity_user ON activity_log(user_id);
-CREATE INDEX idx_activity_time ON activity_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_activity_org ON activity_log(organization_id);
+CREATE INDEX IF NOT EXISTS idx_activity_entity ON activity_log(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_time ON activity_log(created_at DESC);
 
 -- ============================================
 -- MESSAGING
 -- ============================================
 
-CREATE TABLE conversations (
+CREATE TABLE IF NOT EXISTS conversations (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) NOT NULL,
   case_id UUID REFERENCES cases(id),
@@ -323,7 +323,7 @@ CREATE TABLE conversations (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE conversation_participants (
+CREATE TABLE IF NOT EXISTS conversation_participants (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE NOT NULL,
   user_id UUID REFERENCES user_profiles(id) NOT NULL,
@@ -336,7 +336,7 @@ CREATE TABLE conversation_participants (
   joined_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE messages (
+CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE NOT NULL,
   sender_id UUID REFERENCES user_profiles(id),
@@ -353,17 +353,25 @@ CREATE TABLE messages (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_messages_conversation ON messages(conversation_id, created_at DESC);
-CREATE INDEX idx_conversation_participants ON conversation_participants(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation ON messages(conversation_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_conversation_participants ON conversation_participants(user_id);
 
--- Enable realtime for messages
-ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+-- Enable realtime for messages (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime' AND tablename = 'messages'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+  END IF;
+END $$;
 
 -- ============================================
 -- DOCUMENTS
 -- ============================================
 
-CREATE TABLE documents (
+CREATE TABLE IF NOT EXISTS documents (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) NOT NULL,
   case_id UUID REFERENCES cases(id),
@@ -392,15 +400,15 @@ CREATE TABLE documents (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_documents_case ON documents(case_id);
-CREATE INDEX idx_documents_patient ON documents(patient_id);
-CREATE INDEX idx_documents_search ON documents USING gin (to_tsvector('english', coalesce(name, '') || ' ' || coalesce(ocr_text, '')));
+CREATE INDEX IF NOT EXISTS idx_documents_case ON documents(case_id);
+CREATE INDEX IF NOT EXISTS idx_documents_patient ON documents(patient_id);
+CREATE INDEX IF NOT EXISTS idx_documents_search ON documents USING gin (to_tsvector('english', coalesce(name, '') || ' ' || coalesce(ocr_text, '')));
 
 -- ============================================
 -- SETTLEMENTS & FINANCIALS
 -- ============================================
 
-CREATE TABLE settlements (
+CREATE TABLE IF NOT EXISTS settlements (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) NOT NULL,
   case_id UUID REFERENCES cases(id) NOT NULL,
@@ -437,14 +445,14 @@ CREATE TABLE settlements (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_settlements_case ON settlements(case_id);
-CREATE INDEX idx_settlements_status ON settlements(status);
+CREATE INDEX IF NOT EXISTS idx_settlements_case ON settlements(case_id);
+CREATE INDEX IF NOT EXISTS idx_settlements_status ON settlements(status);
 
 -- ============================================
 -- CLINICAL TRIALS (saved/matched)
 -- ============================================
 
-CREATE TABLE saved_clinical_trials (
+CREATE TABLE IF NOT EXISTS saved_clinical_trials (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   organization_id UUID REFERENCES organizations(id) NOT NULL,
   patient_id UUID REFERENCES patients(id),
@@ -473,8 +481,8 @@ CREATE TABLE saved_clinical_trials (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE INDEX idx_trials_patient ON saved_clinical_trials(patient_id);
-CREATE INDEX idx_trials_nct ON saved_clinical_trials(nct_id);
+CREATE INDEX IF NOT EXISTS idx_trials_patient ON saved_clinical_trials(patient_id);
+CREATE INDEX IF NOT EXISTS idx_trials_nct ON saved_clinical_trials(nct_id);
 
 -- ============================================
 -- ROW LEVEL SECURITY
@@ -494,6 +502,23 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE settlements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE saved_clinical_trials ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies if they exist (makes script idempotent)
+DROP POLICY IF EXISTS "Users see own org" ON organizations;
+DROP POLICY IF EXISTS "Users see own profile" ON user_profiles;
+DROP POLICY IF EXISTS "Users can read own profile" ON user_profiles;
+DROP POLICY IF EXISTS "Users see org patients" ON patients;
+DROP POLICY IF EXISTS "Users see org cases" ON cases;
+DROP POLICY IF EXISTS "Users see case team" ON care_team_members;
+DROP POLICY IF EXISTS "Users see org assessments" ON assessments;
+DROP POLICY IF EXISTS "Users see org tasks" ON tasks;
+DROP POLICY IF EXISTS "Users see org activity" ON activity_log;
+DROP POLICY IF EXISTS "Users see org conversations" ON conversations;
+DROP POLICY IF EXISTS "Users see own conversations" ON conversation_participants;
+DROP POLICY IF EXISTS "Users see conversation messages" ON messages;
+DROP POLICY IF EXISTS "Users see org documents" ON documents;
+DROP POLICY IF EXISTS "Users see org settlements" ON settlements;
+DROP POLICY IF EXISTS "Users see org trials" ON saved_clinical_trials;
 
 -- Basic RLS policies (users see their organization's data)
 CREATE POLICY "Users see own org" ON organizations
@@ -550,6 +575,19 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+-- Drop existing triggers if they exist (makes script idempotent)
+DROP TRIGGER IF EXISTS update_organizations_updated_at ON organizations;
+DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
+DROP TRIGGER IF EXISTS update_patients_updated_at ON patients;
+DROP TRIGGER IF EXISTS update_cases_updated_at ON cases;
+DROP TRIGGER IF EXISTS update_assessments_updated_at ON assessments;
+DROP TRIGGER IF EXISTS update_tasks_updated_at ON tasks;
+DROP TRIGGER IF EXISTS update_conversations_updated_at ON conversations;
+DROP TRIGGER IF EXISTS update_documents_updated_at ON documents;
+DROP TRIGGER IF EXISTS update_settlements_updated_at ON settlements;
+DROP TRIGGER IF EXISTS generate_case_number_trigger ON cases;
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 
 CREATE TRIGGER update_organizations_updated_at BEFORE UPDATE ON organizations FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 CREATE TRIGGER update_user_profiles_updated_at BEFORE UPDATE ON user_profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at();
