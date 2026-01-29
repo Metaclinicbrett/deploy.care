@@ -135,6 +135,15 @@ export const routes: Routes = [
     title: 'Health Questionnaire'
   },
 
+  // Clinical Trials
+  {
+    path: 'trials',
+    loadComponent: () => import('./pages/clinical-trials/clinical-trials.component')
+      .then(m => m.ClinicalTrialsComponent),
+    canActivate: [authGuard],
+    title: 'Clinical Trials'
+  },
+
   // Admin routes
   {
     path: 'admin',
