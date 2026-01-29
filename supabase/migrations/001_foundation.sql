@@ -24,11 +24,13 @@ CREATE TABLE user_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   organization_id UUID REFERENCES organizations(id),
   email TEXT NOT NULL,
-  full_name TEXT NOT NULL,
+  first_name TEXT,
+  last_name TEXT,
   avatar_url TEXT,
-  role TEXT NOT NULL CHECK (role IN ('admin', 'care_coordinator', 'case_manager', 'attorney', 'provider', 'billing', 'viewer')),
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('super_admin', 'org_admin', 'provider', 'staff', 'user', 'law_firm')),
   phone TEXT,
   title TEXT,
+  is_approved BOOLEAN DEFAULT FALSE,
   permissions JSONB DEFAULT '[]',
   last_active_at TIMESTAMPTZ,
   onboarding_completed BOOLEAN DEFAULT FALSE,
@@ -589,12 +591,14 @@ CREATE TRIGGER generate_case_number_trigger
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO user_profiles (id, email, full_name, role)
+  INSERT INTO user_profiles (id, email, first_name, last_name, role, is_approved)
   VALUES (
     NEW.id,
     NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email),
-    'viewer'
+    NEW.raw_user_meta_data->>'first_name',
+    NEW.raw_user_meta_data->>'last_name',
+    'user',
+    FALSE  -- New users need admin approval
   );
   RETURN NEW;
 END;
@@ -604,3 +608,7 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION handle_new_user();
+
+-- Allow users to read their own profile before approval (for pending-approval page)
+CREATE POLICY "Users can read own profile" ON user_profiles
+  FOR SELECT USING (id = auth.uid());

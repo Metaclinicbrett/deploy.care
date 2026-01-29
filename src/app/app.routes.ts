@@ -2,6 +2,15 @@ import { Routes } from '@angular/router';
 import { authGuard, adminGuard, publicGuard, lawFirmGuard, settlementGuard, escalationGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
+  // Home / Landing Page
+  {
+    path: '',
+    loadComponent: () => import('./pages/home/home.component')
+      .then(m => m.HomeComponent),
+    pathMatch: 'full',
+    title: 'Deploy.Care | The Backend of Our Wellness Future'
+  },
+
   // Public Marketing Pages
   {
     path: 'employers',
@@ -43,12 +52,7 @@ export const routes: Routes = [
     title: 'Authenticating...'
   },
 
-  // Protected routes
-  {
-    path: '',
-    redirectTo: 'dashboard',
-    pathMatch: 'full'
-  },
+  // Protected routes (App)
   {
     path: 'dashboard',
     loadComponent: () => import('./pages/dashboard/dashboard.component')
