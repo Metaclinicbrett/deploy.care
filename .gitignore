@@ -1,0 +1,56 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Build
+/dist
+/tmp
+/out-tsc
+/bazel-out
+
+# Angular
+.angular/cache
+.angular/
+
+# IDE
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Misc
+/.sass-cache
+/connect.lock
+/coverage
+/libpeerconnection.log
+npm-debug.log
+yarn-error.log
+testem.log
+/typings
+*.log
+*.logs
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Environment files (keep templates, ignore actual)
+/src/environments/environment.ts
+/src/environments/environment.prod.ts
+!src/environments/environment.example.ts
+
+# Vercel
+.vercel
+.env*.local

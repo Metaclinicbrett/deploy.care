@@ -1,0 +1,442 @@
+<div class="min-h-screen bg-slate-50">
+  <!-- Header -->
+  <header class="bg-blue-600 text-white shadow-lg sticky top-0 z-50">
+    <div class="px-4 py-2.5 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500"></div>
+          <span class="font-semibold tracking-wider text-sm">
+            <span class="text-white">neuro</span>
+            <span class="text-blue-200">glympse</span>
+          </span>
+        </div>
+        <nav class="hidden lg:flex items-center gap-4 text-xs">
+          <a href="#" class="hover:text-blue-200 transition">PATIENTS</a>
+          <a href="#" class="hover:text-blue-200 transition">REQUESTS</a>
+          <a href="#" class="hover:text-blue-200 transition">ENCOUNTERS</a>
+          <a href="#" class="hover:text-blue-200 transition">CARE PLANS</a>
+          <a href="#" class="hover:text-blue-200 transition">CLAIMS</a>
+          <a href="#" class="border-b-2 border-white pb-0.5 hover:text-blue-200 transition">CASES</a>
+        </nav>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-blue-800 flex items-center justify-center text-sm font-medium">S</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Case Header -->
+  <div class="bg-white border-b border-gray-200">
+    <div class="max-w-7xl mx-auto px-4 py-4">
+      <div class="flex items-start justify-between">
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-2xl">
+            💼
+          </div>
+          <div>
+            <div class="flex items-center gap-3">
+              <h1 class="text-xl font-bold text-gray-900">{{ caseInfo.caseType }} {{ caseInfo.caseNumber }}</h1>
+              <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-semibold">{{ caseInfo.status }}</span>
+            </div>
+            <div class="flex items-center gap-4 mt-1 text-sm text-gray-500">
+              <span>Patient: {{ caseInfo.patientName }} • {{ caseInfo.patientAge }} y/o {{ caseInfo.patientGender }}</span>
+              <span>•</span>
+              <span>DOI: {{ caseInfo.dateOfInjury }}</span>
+              <span>•</span>
+              <span class="text-green-600 font-semibold">Total Billed: {{ caseInfo.totalBilled }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2">
+            📥 Export Billing Summary
+          </button>
+          <button class="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition flex items-center gap-2">
+            📥 Export Case File
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-4 py-4">
+    <!-- Since Query Panel -->
+    <div class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-gray-900 flex items-center gap-2">
+          🔍 Since Query
+        </h3>
+        <button (click)="resetQuery()" class="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
+          🔄 Reset
+        </button>
+      </div>
+
+      <div class="grid md:grid-cols-4 gap-3">
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Since Date</label>
+          <input
+            type="date"
+            [value]="querySignal().startDate"
+            (change)="updateQuery({ startDate: $any($event.target).value })"
+            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">To Date</label>
+          <input
+            type="date"
+            [value]="querySignal().endDate"
+            (change)="updateQuery({ endDate: $any($event.target).value })"
+            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+          />
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Care Model</label>
+          <select
+            [value]="querySignal().careModel"
+            (change)="updateQuery({ careModel: $any($event.target).value })"
+            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+          >
+            @for (model of careModels; track model) {
+              <option [value]="model">{{ model }}</option>
+            }
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-500 mb-1">Quick Select</label>
+          <div class="flex gap-1">
+            @for (preset of ['7D', '30D', '90D', 'YTD']; track preset) {
+              <button
+                (click)="setPreset(preset)"
+                [class]="querySignal().preset === preset
+                  ? 'flex-1 py-2 rounded-lg text-xs font-medium bg-blue-600 text-white'
+                  : 'flex-1 py-2 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-gray-200'"
+              >
+                {{ preset }}
+              </button>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-3 pt-3 border-t border-gray-100">
+        <label class="block text-xs font-medium text-gray-500 mb-2">Filter by DX/TX Tags</label>
+        <div class="flex flex-wrap gap-2">
+          @for (tag of dxTxTags; track tag.code) {
+            <button
+              (click)="toggleTag(tag.code)"
+              [class]="isTagSelected(tag.code)
+                ? (tag.type === 'DX'
+                    ? 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition bg-emerald-100 text-emerald-700 border-2 border-emerald-300'
+                    : 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition bg-blue-100 text-blue-700 border-2 border-blue-300')
+                : 'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition bg-gray-100 text-gray-600 border-2 border-transparent hover:bg-gray-200'"
+            >
+              <span [class]="tag.type === 'DX'
+                ? 'px-1 py-0.5 rounded text-xs font-bold bg-emerald-200 text-emerald-800'
+                : 'px-1 py-0.5 rounded text-xs font-bold bg-blue-200 text-blue-800'"
+              >
+                {{ tag.type }}
+              </span>
+              <code class="font-mono">{{ tag.code }}</code>
+              <span class="text-gray-500">{{ tag.label }}</span>
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid lg:grid-cols-3 gap-4">
+      <!-- Left Column -->
+      <div class="lg:col-span-2 space-y-4">
+        <!-- Tabs Panel -->
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div class="flex border-b border-gray-100">
+            @for (tab of tabs; track tab.id) {
+              <button
+                (click)="setActiveTab(tab.id)"
+                [class]="activeTabSignal() === tab.id
+                  ? 'flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition text-blue-600 border-b-2 border-blue-600 bg-blue-50/50'
+                  : 'flex-1 flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium transition text-gray-500 hover:text-gray-700 hover:bg-gray-50'"
+              >
+                @switch (tab.icon) {
+                  @case ('heart') { ❤️ }
+                  @case ('shield') { 🛡️ }
+                  @case ('scale') { ⚖️ }
+                  @case ('user') { 👤 }
+                }
+                {{ tab.label }}
+              </button>
+            }
+          </div>
+
+          <!-- Cure View Tab -->
+          @if (activeTabSignal() === 'cure') {
+            <div class="p-4">
+              <div class="flex items-center justify-between mb-4">
+                <h2 class="font-semibold text-gray-900">Active Provider Recommendations</h2>
+                <span class="text-xs text-gray-500">
+                  Showing data since {{ querySignal().startDate }}
+                </span>
+              </div>
+
+              <div class="space-y-4">
+                @for (provider of providers; track provider.name; let idx = $index) {
+                  <!-- Provider Recommendation Card -->
+                  <div [class]="'bg-white rounded-xl border-2 overflow-hidden transition-all ' +
+                    (idx === 0 ? 'border-green-300 shadow-lg shadow-green-100' : 'border-gray-200')">
+                    <div class="p-4">
+                      <div class="flex items-start justify-between mb-3">
+                        <div class="flex items-center gap-3">
+                          <div [class]="getProviderIconBg(provider.type) + ' w-12 h-12 rounded-xl flex items-center justify-center'">
+                            @switch (getProviderIcon(provider.type)) {
+                              @case ('heart') { ❤️ }
+                              @case ('scale') { ⚖️ }
+                            }
+                          </div>
+                          <div>
+                            <div class="flex items-center gap-2">
+                              <h4 class="font-semibold text-gray-900">{{ provider.name }}</h4>
+                              @if (idx === 0) {
+                                <span class="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                                  <span class="w-2 h-2 bg-green-500 rounded-full pulse-live"></span>
+                                  Live
+                                </span>
+                              }
+                            </div>
+                            <p class="text-sm text-gray-500">{{ provider.specialty }}</p>
+                            <p class="text-xs text-gray-400">{{ provider.organization }}</p>
+                          </div>
+                        </div>
+                        <div class="text-right">
+                          <p class="text-xs text-gray-500">Last Updated</p>
+                          <p class="text-sm font-medium text-gray-700">{{ provider.lastUpdate }}</p>
+                        </div>
+                      </div>
+
+                      <div [class]="provider.type === 'medical'
+                        ? 'p-3 rounded-lg mb-3 bg-blue-50 border border-blue-200'
+                        : 'p-3 rounded-lg mb-3 bg-amber-50 border border-amber-200'">
+                        <p class="text-xs font-semibold text-gray-500 mb-1">ACTIVE RECOMMENDATION</p>
+                        <p class="text-sm text-gray-800">{{ provider.recommendation }}</p>
+                      </div>
+
+                      <div class="flex items-center gap-2 mb-3">
+                        <span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">
+                          {{ provider.careModel }}
+                        </span>
+                        <span class="text-xs text-gray-500">
+                          {{ provider.encounterCount }} encounters
+                        </span>
+                      </div>
+
+                      <div class="flex gap-2">
+                        <button (click)="viewData(provider)" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-700 transition flex items-center justify-center gap-1">
+                          👁️ View Data
+                        </button>
+                        <button (click)="requestProviderUpdate(provider)" class="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-700 transition flex items-center justify-center gap-1">
+                          💬 Request Update
+                        </button>
+                        <button
+                          (click)="toggleProviderExpanded(idx)"
+                          class="px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs font-medium text-gray-700 transition"
+                        >
+                          ⌄
+                        </button>
+                      </div>
+                    </div>
+
+                    @if (isProviderExpanded(idx)) {
+                      <div class="px-4 pb-4 pt-0 border-t border-gray-100 bg-gray-50">
+                        <div class="pt-3 space-y-2">
+                          <p class="text-xs font-semibold text-gray-500">TREATMENT PLAN</p>
+                          <p class="text-sm text-gray-700">{{ provider.treatmentPlan }}</p>
+                          <div class="flex gap-2 mt-3">
+                            @for (code of provider.dxCodes; track code) {
+                              <span class="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-mono">
+                                {{ code }}
+                              </span>
+                            }
+                          </div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Other Tabs -->
+          @if (activeTabSignal() !== 'cure') {
+            <div class="p-8 text-center text-gray-500">
+              <p>{{ activeTabSignal() | titlecase }} content here</p>
+            </div>
+          }
+        </div>
+
+        <!-- Encounter Timeline -->
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="font-semibold text-gray-900">📅 Encounter Timeline</h3>
+            <button class="text-xs text-blue-600 hover:text-blue-800 font-medium">View All</button>
+          </div>
+          <div class="max-h-64 overflow-y-auto">
+            @for (encounter of encounters; track encounter.id; let idx = $index) {
+              <div class="p-3 border-b border-gray-50 hover:bg-gray-50 transition flex items-center gap-3">
+                <div [class]="getEncounterTypeDot(encounter.type) + ' w-2 h-2 rounded-full'"></div>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="font-medium text-sm text-gray-900">{{ encounter.id }}</span>
+                    <span [class]="getEncounterTypeBg(encounter.type) + ' ' + getEncounterTypeText(encounter.type) + ' px-1.5 py-0.5 rounded text-xs font-medium'">
+                      {{ encounter.type }}
+                    </span>
+                  </div>
+                  <p class="text-xs text-gray-500">{{ encounter.date }}</p>
+                </div>
+                <button (click)="viewEncounter(encounter)" class="p-1.5 hover:bg-gray-200 rounded">
+                  👁️
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Sidebar -->
+      <div class="space-y-4">
+        <!-- GatherMed Panel -->
+        <div class="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border-2 border-emerald-200 p-4">
+          <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white text-lg">
+                📊
+              </div>
+              <div>
+                <h3 class="font-semibold text-gray-900">GatherMed</h3>
+                <p class="text-xs text-gray-500">Real-time RPM Data</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="flex items-center gap-1 px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs font-medium">
+                <span class="w-2 h-2 bg-green-500 rounded-full pulse-live"></span>
+                Connected
+              </span>
+              <button class="p-2 hover:bg-white/50 rounded-lg transition">
+                🔄
+              </button>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-4 gap-2 mb-4 p-3 bg-white rounded-lg">
+            <div class="text-center">
+              <p class="text-xs text-gray-500">TCM Time</p>
+              <p class="font-mono font-bold text-gray-900">00:00:00</p>
+            </div>
+            <div class="text-center">
+              <p class="text-xs text-gray-500">CCM Time</p>
+              <p class="font-mono font-bold text-gray-900">00:00:00</p>
+            </div>
+            <div class="text-center">
+              <p class="text-xs text-gray-500">RTM Time</p>
+              <p class="font-mono font-bold text-blue-600">01:03:07</p>
+            </div>
+            <div class="text-center">
+              <p class="text-xs text-gray-500">Total Time</p>
+              <p class="font-mono font-bold text-green-600">01:03:07</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-5 gap-2 mb-4">
+            @for (metric of rpmMetrics; track metric.label) {
+              <div class="bg-white rounded-lg p-2 text-center">
+                <p class="text-xs text-gray-500 truncate">{{ metric.label }}</p>
+                <p [class]="'text-lg font-bold ' + getColorClass(metric.color, 'text')">
+                  {{ metric.value }}
+                </p>
+                <div [class]="getTrendColor(metric.trend) + ' flex items-center justify-center gap-1 text-xs'">
+                  {{ getTrendIcon(metric.trend) }}
+                  {{ metric.lastReading }}
+                </div>
+              </div>
+            }
+          </div>
+
+          <div class="bg-white rounded-lg p-3">
+            <p class="text-xs font-medium text-gray-500 mb-2">30-Day Trend</p>
+            <div class="h-24 flex items-end justify-around gap-1">
+              @for (point of rpmData; track point.date) {
+                <div class="flex-1 flex flex-col items-center">
+                  <div [style.height.%]="(point.stress * 100)" class="w-full bg-red-400 rounded-t opacity-60"></div>
+                  <p class="text-xs text-gray-500 mt-1">{{ point.date }}</p>
+                </div>
+              }
+            </div>
+          </div>
+
+          <button class="w-full mt-3 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white rounded-lg text-sm font-semibold hover:opacity-90 transition flex items-center justify-center gap-2">
+            📥 Import Selected Data to Summary
+          </button>
+        </div>
+
+        <!-- Quick Actions Panel -->
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 class="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+            ⚡ Quick Actions
+          </h3>
+          <div class="grid grid-cols-2 gap-2">
+            @for (action of quickActions; track action.id) {
+              <button
+                (click)="handleQuickAction(action.id)"
+                [class]="'p-3 rounded-xl text-left transition hover:shadow-md ' + getActionColorClass(action.color)"
+              >
+                <div [class]="'w-8 h-8 rounded-lg flex items-center justify-center mb-2 ' + getActionIconBg(action.color)">
+                  @switch (action.icon) {
+                    @case ('file-text') { 📄 }
+                    @case ('plus') { ➕ }
+                    @case ('calendar') { 📅 }
+                    @case ('bell') { 🔔 }
+                    @case ('brain') { 🧠 }
+                    @case ('download') { 📥 }
+                  }
+                </div>
+                <p class="font-medium text-gray-900 text-sm">{{ action.label }}</p>
+                <p class="text-xs text-gray-500">{{ action.desc }}</p>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Case Parties Panel -->
+        <div class="bg-white rounded-xl border border-gray-200 p-4">
+          <h3 class="font-semibold text-gray-900 mb-3">👥 Case Parties</h3>
+          <div class="space-y-3">
+            @for (party of caseParties; track party.name) {
+              <div [class]="'p-3 rounded-lg border ' + getCasePartyIconBg(party.type)">
+                <div class="flex items-center gap-3">
+                  <div [class]="getCasePartyIconBox(party.type) + ' w-10 h-10 rounded-lg flex items-center justify-center'">
+                    @switch (getCasePartyIcon(party.type)) {
+                      @case ('scale') { ⚖️ }
+                      @case ('heart') { ❤️ }
+                    }
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="font-medium text-gray-900 text-sm">{{ party.name }}</p>
+                    <p class="text-xs text-gray-500">{{ party.role }}</p>
+                  </div>
+                  <button class="p-2 hover:bg-white rounded-lg transition">
+                    💬
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
