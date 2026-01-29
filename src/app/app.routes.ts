@@ -2,7 +2,27 @@ import { Routes } from '@angular/router';
 import { authGuard, adminGuard, publicGuard, lawFirmGuard, settlementGuard, escalationGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
-  // Public routes
+  // Public Marketing Pages
+  {
+    path: 'employers',
+    loadComponent: () => import('./pages/employers/employers.component')
+      .then(m => m.EmployersComponent),
+    title: 'For Employers | Deploy.Care'
+  },
+  {
+    path: 'our-story',
+    loadComponent: () => import('./pages/story/story.component')
+      .then(m => m.StoryComponent),
+    title: 'Our Story | Deploy.Care'
+  },
+  {
+    path: 'services',
+    loadComponent: () => import('./pages/services/services.component')
+      .then(m => m.ServicesComponent),
+    title: 'Services | Deploy.Care'
+  },
+
+  // Auth routes
   {
     path: 'login',
     loadComponent: () => import('./pages/login/login.component')
@@ -142,6 +162,69 @@ export const routes: Routes = [
       .then(m => m.ClinicalTrialsComponent),
     canActivate: [authGuard],
     title: 'Clinical Trials'
+  },
+  {
+    path: 'clinical-trials',
+    loadComponent: () => import('./pages/clinical-trials/clinical-trials.component')
+      .then(m => m.ClinicalTrialsComponent),
+    canActivate: [authGuard],
+    title: 'Clinical Trials'
+  },
+
+  // Additional route aliases for sidebar navigation
+  {
+    path: 'patients',
+    redirectTo: 'cases',
+    pathMatch: 'full'
+  },
+  {
+    path: 'patient-assessment',
+    loadComponent: () => import('./pages/staff-assessment/staff-assessment.component')
+      .then(m => m.StaffAssessmentComponent),
+    canActivate: [authGuard],
+    title: 'Patient Assessments'
+  },
+  {
+    path: 'settlement-approval',
+    loadComponent: () => import('./pages/settlement-approval/settlement-approval.component')
+      .then(m => m.SettlementApprovalComponent),
+    canActivate: [authGuard],
+    title: 'Settlement Approval'
+  },
+  {
+    path: 'law-firm-search',
+    loadComponent: () => import('./pages/law-firm-search/law-firm-search.component')
+      .then(m => m.LawFirmSearchComponent),
+    canActivate: [authGuard],
+    title: 'Law Firm Search'
+  },
+  {
+    path: 'law-firm-dashboard',
+    loadComponent: () => import('./pages/law-firm-dashboard/law-firm-dashboard.component')
+      .then(m => m.LawFirmDashboardComponent),
+    canActivate: [authGuard],
+    title: 'Law Firm Dashboard'
+  },
+  {
+    path: 'staff-assessment',
+    loadComponent: () => import('./pages/staff-assessment/staff-assessment.component')
+      .then(m => m.StaffAssessmentComponent),
+    canActivate: [authGuard],
+    title: 'Staff Assessment'
+  },
+  {
+    path: 'documents',
+    loadComponent: () => import('./pages/cases/cases.component')
+      .then(m => m.CasesComponent),
+    canActivate: [authGuard],
+    title: 'Documents'
+  },
+  {
+    path: 'team',
+    loadComponent: () => import('./pages/admin/admin.component')
+      .then(m => m.AdminComponent),
+    canActivate: [authGuard],
+    title: 'Team Management'
   },
 
   // Admin routes
