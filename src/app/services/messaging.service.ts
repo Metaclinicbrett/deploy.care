@@ -454,7 +454,7 @@ export class MessagingService implements OnDestroy {
   // ============================================
 
   /**
-   * Send email message
+   * Send email message via Supabase Edge Function (Gmail API)
    */
   async sendEmail(
     to: string[],
@@ -476,7 +476,7 @@ export class MessagingService implements OnDestroy {
         direction: 'outbound',
         to,
         cc,
-        from: 'notifications@deploy.care', // From config
+        from: 'notifications@deploy.care',
         subject,
         bodyHtml,
         bodyText,
@@ -484,16 +484,31 @@ export class MessagingService implements OnDestroy {
         createdAt: new Date().toISOString()
       };
 
-      // In production: call backend API which uses Gmail API
-      // const response = await fetch('/api/messaging/email', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ to, subject, bodyHtml, bodyText, patientId, caseId })
-      // });
+      // Call Supabase Edge Function
+      const { data, error } = await this.supabase.client.functions.invoke('send-email', {
+        body: {
+          to,
+          cc,
+          subject,
+          bodyHtml,
+          bodyText,
+          patientId,
+          caseId
+        }
+      });
 
-      // Simulate success
+      if (error) {
+        console.error('Email send error:', error);
+        emailMessage.status = 'failed';
+        this._error.set(error.message);
+        return emailMessage;
+      }
+
+      // Update with response
       emailMessage.status = 'sent';
       emailMessage.sentAt = new Date().toISOString();
+      emailMessage.gmailMessageId = data?.messageId;
+      emailMessage.gmailThreadId = data?.threadId;
 
       console.log('Email sent:', emailMessage);
       return emailMessage;
