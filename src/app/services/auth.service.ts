@@ -168,10 +168,14 @@ export class AuthService {
   }
 
   async signInWithMagicLink(email: string) {
+    const redirectUrl = isPlatformBrowser(this.platformId)
+      ? `${window.location.origin}/auth/callback`
+      : environment.appUrl ? `${environment.appUrl}/auth/callback` : undefined;
+
     const { data, error } = await this.supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`
+        emailRedirectTo: redirectUrl
       }
     });
     if (error) throw error;
@@ -185,8 +189,12 @@ export class AuthService {
   }
 
   async resetPassword(email: string) {
+    const redirectUrl = isPlatformBrowser(this.platformId)
+      ? `${window.location.origin}/auth/reset-password`
+      : environment.appUrl ? `${environment.appUrl}/auth/reset-password` : undefined;
+
     const { data, error } = await this.supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`
+      redirectTo: redirectUrl
     });
     if (error) throw error;
     return data;

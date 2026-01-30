@@ -208,7 +208,11 @@ export class MessagingService implements OnDestroy {
         'broadcast',
         { event: 'typing' },
         (payload) => {
-          this.handleTypingEvent(payload);
+          // Supabase broadcast wraps data in payload['payload']
+          const typingData = payload['payload'] as { isTyping: boolean; userId: string } | undefined;
+          if (typingData?.isTyping !== undefined && typingData?.userId) {
+            this.handleTypingEvent(typingData);
+          }
         }
       )
       .subscribe();
@@ -239,8 +243,20 @@ export class MessagingService implements OnDestroy {
 
       this._messages.set((data as ChatMessage[]).reverse());
     } catch (err) {
-      // If table doesn't exist, use mock data
-      this._messages.set([]);
+      // Handle gracefully if table doesn't exist yet (common during dev)
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      const isTableMissing = errorMessage.includes('does not exist') ||
+                             errorMessage.includes('relation') ||
+                             errorMessage.includes('42P01'); // PostgreSQL table not found code
+
+      if (isTableMissing) {
+        console.debug('MessagingService: chat_messages table not found, using empty state');
+        this._messages.set([]);
+      } else {
+        console.error('Failed to load messages:', err);
+        this._error.set('Failed to load messages');
+        this._messages.set([]);
+      }
     } finally {
       this._loading.set(false);
     }

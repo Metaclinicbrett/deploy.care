@@ -1,4 +1,5 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject, PLATFORM_ID } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import {
   AssessmentType,
   AssessmentTemplate,
@@ -9,11 +10,13 @@ import {
   calculateScore,
   getInterpretation
 } from '../models/assessment.model';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AssessmentService {
+  private platformId = inject(PLATFORM_ID);
   private _assessments = signal<PatientAssessment[]>([]);
   private _currentAssessment = signal<PatientAssessment | null>(null);
   private _accessTokens = signal<PatientAccessToken[]>([]);
@@ -106,7 +109,10 @@ export class AssessmentService {
     this._accessTokens.update(list => [...list, accessToken]);
 
     // Generate the patient-facing link
-    const link = `${window.location.origin}/patient/assessment/${token}`;
+    const baseUrl = isPlatformBrowser(this.platformId)
+      ? window.location.origin
+      : (environment.appUrl || 'https://deploy.care');
+    const link = `${baseUrl}/patient/assessment/${token}`;
 
     return { assessment, accessToken, link };
   }
@@ -270,7 +276,10 @@ export class AssessmentService {
       )
     );
 
-    return `${window.location.origin}/patient/assessment/${newToken}`;
+    const baseUrl = isPlatformBrowser(this.platformId)
+      ? window.location.origin
+      : (environment.appUrl || 'https://deploy.care');
+    return `${baseUrl}/patient/assessment/${newToken}`;
   }
 
   // Helper methods

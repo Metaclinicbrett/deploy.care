@@ -9,6 +9,43 @@ export interface AuthState {
   loading: boolean;
 }
 
+// Database input types for type-safe mutations
+export interface CaseInput {
+  patient_id: string;
+  care_plan_id: string | number;
+  status?: 'active' | 'pending' | 'completed' | 'cancelled';
+  notes?: string;
+  organization_id?: string;
+  assigned_to?: string;
+  created_at?: string;
+}
+
+export interface PatientInput {
+  first_name: string;
+  last_name: string;
+  email?: string;
+  phone?: string;
+  date_of_birth?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  insurance_provider?: string;
+  insurance_id?: string;
+}
+
+export interface EncounterDbInput {
+  case_id: string;
+  encounter_date: string;
+  encounter_type?: string;
+  status?: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  provider_id?: string;
+  notes?: string;
+  cpt_codes?: string[];
+  icd_codes?: string[];
+  billed_amount?: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -78,10 +115,14 @@ export class SupabaseService {
   }
 
   async signInWithMagicLink(email: string) {
+    const redirectUrl = isPlatformBrowser(this.platformId)
+      ? `${window.location.origin}/auth/callback`
+      : environment.appUrl ? `${environment.appUrl}/auth/callback` : undefined;
+
     const { data, error } = await this.supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`
+        emailRedirectTo: redirectUrl
       }
     });
     if (error) throw error;
@@ -94,8 +135,12 @@ export class SupabaseService {
   }
 
   async resetPassword(email: string) {
+    const redirectUrl = isPlatformBrowser(this.platformId)
+      ? `${window.location.origin}/auth/reset-password`
+      : environment.appUrl ? `${environment.appUrl}/auth/reset-password` : undefined;
+
     const { data, error } = await this.supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset-password`
+      redirectTo: redirectUrl
     });
     if (error) throw error;
     return data;
@@ -165,7 +210,7 @@ export class SupabaseService {
     return data;
   }
 
-  async createCase(caseData: any) {
+  async createCase(caseData: CaseInput) {
     const { data, error } = await this.supabase
       .from('cases')
       .insert(caseData)
@@ -185,7 +230,7 @@ export class SupabaseService {
     return data;
   }
 
-  async createPatient(patientData: any) {
+  async createPatient(patientData: PatientInput) {
     const { data, error } = await this.supabase
       .from('patients')
       .insert(patientData)
@@ -196,7 +241,7 @@ export class SupabaseService {
   }
 
   // Encounters
-  async createEncounter(encounterData: any) {
+  async createEncounter(encounterData: EncounterDbInput) {
     const { data, error } = await this.supabase
       .from('encounters')
       .insert(encounterData)
@@ -206,7 +251,7 @@ export class SupabaseService {
     return data;
   }
 
-  async updateEncounter(id: string, updates: any) {
+  async updateEncounter(id: string, updates: Partial<EncounterDbInput>) {
     const { data, error } = await this.supabase
       .from('encounters')
       .update(updates)
@@ -218,7 +263,7 @@ export class SupabaseService {
   }
 
   // Real-time subscriptions
-  subscribeToCase(caseId: string, callback: (payload: any) => void) {
+  subscribeToCase(caseId: string, callback: (payload: { new: Record<string, unknown>; old: Record<string, unknown>; eventType: string }) => void) {
     return this.supabase
       .channel(`case:${caseId}`)
       .on('postgres_changes',

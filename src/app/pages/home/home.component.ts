@@ -24,7 +24,7 @@ import { RouterLink } from '@angular/router';
             </a>
 
             <div class="hidden md:flex items-center gap-8">
-              <a href="#macro" class="text-slate-300 hover:text-white transition-colors">Macro Wave</a>
+              <a routerLink="/launch" class="text-slate-300 hover:text-white transition-colors">How It Works</a>
               <a href="#specialties" class="text-slate-300 hover:text-white transition-colors">Specialties</a>
               <a href="#features" class="text-slate-300 hover:text-white transition-colors">Features</a>
               <a routerLink="/employers" class="text-slate-300 hover:text-white transition-colors">Employers</a>
@@ -53,27 +53,28 @@ import { RouterLink } from '@angular/router';
           <div class="max-w-4xl mx-auto text-center">
             <div class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-sm font-medium mb-8">
               <span class="w-2 h-2 bg-indigo-400 rounded-full animate-pulse"></span>
-              Now out of stealth
+              The future of care delivery
             </div>
 
             <h1 class="text-5xl lg:text-7xl font-bold text-white mb-6 leading-tight">
-              The Backend of Our<br/>
+              Exit Healthcare.<br/>
               <span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-                Wellness Future
+                Enter Care.
               </span>
             </h1>
 
             <p class="text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
-              RPM, CCM, PCM, TCM, CBT—and a new generation of care apps.
-              We built the infrastructure. Now we're deploying better outcomes.
+              Optimize your business position by creating licensable delivery of care.
+              Opt in or sub out ongoing work under your medical scope.
+              Dial in the exact details that make your care model unique.
             </p>
 
             <div class="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <a routerLink="/login" class="px-8 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-indigo-500/25 transition-all">
-                Start Free Trial
+                Build Your Care Model
               </a>
-              <a href="#macro" class="px-8 py-4 bg-white/10 text-white font-semibold rounded-xl border border-white/20 hover:bg-white/20 transition-all">
-                See the Macro Wave
+              <a routerLink="/launch" class="px-8 py-4 bg-white/10 text-white font-semibold rounded-xl border border-white/20 hover:bg-white/20 transition-all">
+                See How It Works
               </a>
             </div>
 
