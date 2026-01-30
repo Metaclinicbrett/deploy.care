@@ -228,9 +228,13 @@ export class LoginComponent {
         this.password = '';
       } else {
         await this.authService.signIn(this.email, this.password);
+        // Wait for auth state to fully load (profile fetch is async)
+        await this.waitForAuthReady();
         // Check if user is pending approval
         if (this.authService.isPendingApproval()) {
           this.router.navigate(['/pending-approval']);
+        } else if (this.authService.isLawFirm()) {
+          this.router.navigate(['/law-firm/dashboard']);
         } else {
           this.router.navigate(['/dashboard']);
         }
@@ -239,6 +243,18 @@ export class LoginComponent {
       this.error.set(err.message || (this.isSignUp() ? 'Failed to create account' : 'Invalid email or password'));
     } finally {
       this.isLoading.set(false);
+    }
+  }
+
+  private async waitForAuthReady(): Promise<void> {
+    // Wait for the auth service to finish loading the profile
+    const maxWait = 5000;
+    const interval = 50;
+    let waited = 0;
+
+    while (this.authService.loading() && waited < maxWait) {
+      await new Promise(resolve => setTimeout(resolve, interval));
+      waited += interval;
     }
   }
 
