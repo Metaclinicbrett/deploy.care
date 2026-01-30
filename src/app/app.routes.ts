@@ -8,7 +8,15 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/home/home.component')
       .then(m => m.HomeComponent),
     pathMatch: 'full',
-    title: 'Deploy.Care | The Backend of Our Wellness Future'
+    title: 'Deploy.Care | Exit Healthcare. Enter Care.'
+  },
+
+  // Launch - Interactive scroll experience
+  {
+    path: 'launch',
+    loadComponent: () => import('./pages/launch/launch.component')
+      .then(m => m.LaunchComponent),
+    title: 'Deploy.Care | Build Your Care Model'
   },
 
   // Public Marketing Pages
@@ -47,8 +55,8 @@ export const routes: Routes = [
   },
   {
     path: 'auth/callback',
-    loadComponent: () => import('./pages/login/login.component')
-      .then(m => m.LoginComponent),
+    loadComponent: () => import('./pages/auth-callback/auth-callback.component')
+      .then(m => m.AuthCallbackComponent),
     title: 'Authenticating...'
   },
 
