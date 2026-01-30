@@ -1,22 +1,38 @@
-import { Component, signal, computed } from '@angular/core';
+import { Component, signal, computed, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-
-type CaseStatus = 'treating' | 'not_treating' | 'released' | 'pending_settlement' | 'complete' | 'dropped';
-type CaseTab = 'active' | 'completed' | 'dropped';
+import { SupabaseService } from '../../services/supabase.service';
+import { AuthService } from '../../services/auth.service';
 
 interface Case {
   id: string;
-  caseNumber: string;
-  patientName: string;
-  carePlan: string;
-  status: CaseStatus;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
-  doi: string;
-  createdAt: string;
-  encounterCount: number;
-  lastActivity: string;
+  case_number: string;
+  patient_id: string;
+  status: string;
+  priority: string;
+  incident_date: string;
+  case_type: string;
+  created_at: string;
+  patient?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email?: string;
+    phone?: string;
+  };
+}
+
+interface NewCase {
+  patient_first_name: string;
+  patient_last_name: string;
+  patient_email: string;
+  patient_phone: string;
+  patient_dob: string;
+  case_type: string;
+  incident_date: string;
+  priority: string;
+  description: string;
 }
 
 @Component({
@@ -24,193 +40,186 @@ interface Case {
   standalone: true,
   imports: [CommonModule, FormsModule, RouterLink],
   template: `
-    <main class="max-w-7xl mx-auto px-4 py-6">
-      <!-- Page Header -->
+    <main class="max-w-6xl mx-auto px-4 py-8">
+      <!-- Simple Header -->
       <div class="flex items-center justify-between mb-6">
-        <div>
-          <h1 class="text-2xl font-bold text-gray-900 dark:text-white mb-1">Cases</h1>
-          <p class="text-gray-500 dark:text-gray-400">Manage patient cases and track progress</p>
-        </div>
-        <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-          </svg>
-          New Case
+        <h1 class="text-2xl font-semibold text-gray-900">Cases</h1>
+        <button
+          (click)="showNewForm.set(true)"
+          class="px-4 py-2 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800 transition">
+          + New Case
         </button>
       </div>
 
-      <!-- Tab Navigation -->
-      <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
-        <div class="border-b border-gray-200 dark:border-gray-700">
-          <nav class="flex -mb-px">
-            @for (tab of tabs; track tab.id) {
-              <button
-                (click)="activeTab.set(tab.id)"
-                [class]="getTabClass(tab.id)"
-              >
-                <span [class]="getTabIconClass(tab.id)">{{ tab.icon }}</span>
-                <span>{{ tab.label }}</span>
-                <span [class]="getTabCountClass(tab.id)">{{ getTabCount(tab.id) }}</span>
-              </button>
-            }
-          </nav>
+      <!-- Loading State -->
+      @if (loading()) {
+        <div class="flex items-center justify-center py-12">
+          <div class="w-6 h-6 border-2 border-gray-300 border-t-gray-900 rounded-full animate-spin"></div>
+          <span class="ml-3 text-gray-500">Loading cases...</span>
         </div>
+      }
 
-        <!-- Search within tab -->
-        <div class="p-4">
-          <div class="flex items-center gap-4">
-            <div class="flex-1 relative">
-              <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+      <!-- Error State -->
+      @if (error()) {
+        <div class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 mb-4">
+          {{ error() }}
+          <button (click)="loadCases()" class="ml-2 underline">Retry</button>
+        </div>
+      }
+
+      <!-- New Case Form (Notion-style inline) -->
+      @if (showNewForm()) {
+        <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6 shadow-sm">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="font-medium text-gray-900">New Case</h2>
+            <button (click)="showNewForm.set(false)" class="text-gray-400 hover:text-gray-600">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
               </svg>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <!-- Patient Info -->
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">First Name *</label>
               <input
                 type="text"
-                [(ngModel)]="searchTerm"
-                placeholder="Search by patient name, case number, or care plan..."
-                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                [(ngModel)]="newCase.patient_first_name"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="John"
               />
             </div>
-            @if (activeTab() === 'active') {
-              <select [(ngModel)]="statusFilter" class="px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-                <option value="">All Active</option>
-                <option value="treating">Treating</option>
-                <option value="not_treating">Not Treating</option>
-                <option value="pending_settlement">Pending Settlement</option>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Last Name *</label>
+              <input
+                type="text"
+                [(ngModel)]="newCase.patient_last_name"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Smith"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Email</label>
+              <input
+                type="email"
+                [(ngModel)]="newCase.patient_email"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="john@example.com"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Phone</label>
+              <input
+                type="tel"
+                [(ngModel)]="newCase.patient_phone"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Date of Birth *</label>
+              <input
+                type="date"
+                [(ngModel)]="newCase.patient_dob"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Case Type *</label>
+              <select
+                [(ngModel)]="newCase.case_type"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <option value="personal_injury">Personal Injury</option>
+                <option value="auto_accident">Auto Accident</option>
+                <option value="workers_comp">Workers Comp</option>
+                <option value="medical_malpractice">Medical Malpractice</option>
+                <option value="slip_and_fall">Slip and Fall</option>
+                <option value="other">Other</option>
               </select>
-            }
-            <select [(ngModel)]="priorityFilter" class="px-4 py-2.5 border border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
-              <option value="">All Priority</option>
-              <option value="urgent">Urgent</option>
-              <option value="high">High</option>
-              <option value="normal">Normal</option>
-              <option value="low">Low</option>
-            </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Incident Date</label>
+              <input
+                type="date"
+                [(ngModel)]="newCase.incident_date"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-500 mb-1">Priority</label>
+              <select
+                [(ngModel)]="newCase.priority"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                <option value="routine">Routine</option>
+                <option value="asap">ASAP</option>
+                <option value="urgent">Urgent</option>
+                <option value="stat">Stat</option>
+              </select>
+            </div>
+            <div class="col-span-2">
+              <label class="block text-xs font-medium text-gray-500 mb-1">Description</label>
+              <textarea
+                [(ngModel)]="newCase.description"
+                rows="2"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Brief description of the case..."
+              ></textarea>
+            </div>
+          </div>
+
+          <div class="flex justify-end gap-3 mt-4 pt-4 border-t border-gray-100">
+            <button
+              (click)="showNewForm.set(false)"
+              class="px-4 py-2 text-gray-600 text-sm hover:text-gray-900">
+              Cancel
+            </button>
+            <button
+              (click)="createCase()"
+              [disabled]="saving()"
+              class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50">
+              {{ saving() ? 'Creating...' : 'Create Case' }}
+            </button>
           </div>
         </div>
-      </div>
+      }
 
-      <!-- Active Cases View -->
-      @if (activeTab() === 'active') {
-        <div class="space-y-4">
-          @for (case_ of filteredCases(); track case_.id) {
-            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all overflow-hidden">
-              <div class="flex items-stretch">
-                <!-- Status accent -->
-                <div [class]="getStatusAccent(case_.status)"></div>
-
-                <div class="flex-1 p-4">
-                  <div class="flex items-start justify-between">
-                    <!-- Left: Case Info -->
-                    <div class="flex-1">
-                      <div class="flex items-center gap-3 mb-2">
-                        <a [routerLink]="['/cases', case_.id]" class="font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 text-lg">
-                          {{ case_.patientName }}
-                        </a>
-                        <span [class]="getStatusBadge(case_.status)">
-                          {{ getStatusLabel(case_.status) }}
-                        </span>
-                        <span [class]="getPriorityBadge(case_.priority)">
-                          {{ case_.priority | titlecase }}
-                        </span>
-                      </div>
-
-                      <div class="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 mb-3">
-                        <span class="font-mono">{{ case_.caseNumber }}</span>
-                        <span>•</span>
-                        <span>{{ case_.carePlan }}</span>
-                        <span>•</span>
-                        <span>DOI: {{ case_.doi }}</span>
-                      </div>
-
-                      <!-- Encounters summary -->
-                      <div class="flex items-center gap-6">
-                        <div class="flex items-center gap-2 text-sm">
-                          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                          </svg>
-                          <span class="text-gray-600 dark:text-gray-300">{{ case_.encounterCount }} encounters</span>
-                        </div>
-                        <div class="flex items-center gap-2 text-sm">
-                          <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                          </svg>
-                          <span class="text-gray-600 dark:text-gray-300">Last activity: {{ case_.lastActivity }}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Right: Actions -->
+      <!-- Cases Table (Notion-style) -->
+      @if (!loading() && cases().length > 0) {
+        <div class="bg-white border border-gray-200 rounded-lg overflow-hidden">
+          <table class="w-full">
+            <thead>
+              <tr class="border-b border-gray-200 bg-gray-50">
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Patient</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Case #</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Incident</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100">
+              @for (case_ of cases(); track case_.id) {
+                <tr class="hover:bg-gray-50 cursor-pointer" [routerLink]="['/cases', case_.id]">
+                  <td class="px-4 py-3">
                     <div class="flex items-center gap-2">
-                      <a [routerLink]="['/cases', case_.id]" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition">
-                        View Case
-                      </a>
-                      <button class="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"/>
-                        </svg>
-                      </button>
+                      <div class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-medium text-gray-600">
+                        {{ getInitials(case_.patient) }}
+                      </div>
+                      <span class="font-medium text-gray-900">{{ getPatientName(case_.patient) }}</span>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          } @empty {
-            <div class="bg-white dark:bg-gray-800 rounded-xl p-12 text-center">
-              <svg class="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
-              <p class="text-gray-500 dark:text-gray-400">No active cases found</p>
-            </div>
-          }
-        </div>
-      }
-
-      <!-- Completed Cases View -->
-      @if (activeTab() === 'completed') {
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <table class="w-full">
-            <thead class="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Case #</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Patient</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Care Plan</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">DOI</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Completed</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Encounters</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-              @for (case_ of filteredCases(); track case_.id) {
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                  <td class="px-4 py-3">
-                    <a [routerLink]="['/cases', case_.id]" class="font-mono text-blue-600 dark:text-blue-400 hover:text-blue-700">
-                      {{ case_.caseNumber }}
-                    </a>
                   </td>
-                  <td class="px-4 py-3 text-gray-900 dark:text-white font-medium">{{ case_.patientName }}</td>
-                  <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ case_.carePlan }}</td>
-                  <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ case_.doi }}</td>
-                  <td class="px-4 py-3 text-gray-600 dark:text-gray-300">{{ case_.lastActivity }}</td>
+                  <td class="px-4 py-3 font-mono text-sm text-gray-600">{{ case_.case_number }}</td>
+                  <td class="px-4 py-3 text-sm text-gray-600">{{ formatCaseType(case_.case_type) }}</td>
                   <td class="px-4 py-3">
-                    <span class="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full text-xs font-medium">
-                      {{ case_.encounterCount }}
-                    </span>
+                    <span [class]="getStatusClass(case_.status)">{{ case_.status }}</span>
                   </td>
                   <td class="px-4 py-3">
-                    <a [routerLink]="['/cases', case_.id]" class="text-blue-600 dark:text-blue-400 hover:text-blue-700 text-sm font-medium">
-                      View
-                    </a>
+                    <span [class]="getPriorityClass(case_.priority)">{{ case_.priority }}</span>
                   </td>
-                </tr>
-              } @empty {
-                <tr>
-                  <td colspan="7" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
-                    <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    No completed cases found
-                  </td>
+                  <td class="px-4 py-3 text-sm text-gray-500">{{ formatDate(case_.incident_date) }}</td>
+                  <td class="px-4 py-3 text-sm text-gray-500">{{ formatDate(case_.created_at) }}</td>
                 </tr>
               }
             </tbody>
@@ -218,202 +227,205 @@ interface Case {
         </div>
       }
 
-      <!-- Dropped Cases View -->
-      @if (activeTab() === 'dropped') {
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <table class="w-full">
-            <thead class="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
-              <tr>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Case #</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Patient</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Care Plan</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">DOI</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Dropped Date</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Reason</th>
-                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
-              @for (case_ of filteredCases(); track case_.id) {
-                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors opacity-75">
-                  <td class="px-4 py-3">
-                    <a [routerLink]="['/cases', case_.id]" class="font-mono text-gray-600 dark:text-gray-400 hover:text-blue-600">
-                      {{ case_.caseNumber }}
-                    </a>
-                  </td>
-                  <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ case_.patientName }}</td>
-                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ case_.carePlan }}</td>
-                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ case_.doi }}</td>
-                  <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ case_.lastActivity }}</td>
-                  <td class="px-4 py-3">
-                    <span class="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-xs font-medium">
-                      Patient Request
-                    </span>
-                  </td>
-                  <td class="px-4 py-3 space-x-2">
-                    <a [routerLink]="['/cases', case_.id]" class="text-gray-600 dark:text-gray-400 hover:text-blue-600 text-sm font-medium">
-                      View
-                    </a>
-                    <button class="text-blue-600 dark:text-blue-400 hover:text-blue-700 text-sm font-medium">
-                      Reactivate
-                    </button>
-                  </td>
-                </tr>
-              } @empty {
-                <tr>
-                  <td colspan="7" class="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
-                    <svg class="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                    </svg>
-                    No dropped cases found
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+      <!-- Empty State -->
+      @if (!loading() && cases().length === 0 && !error()) {
+        <div class="text-center py-12 bg-white border border-gray-200 rounded-lg">
+          <svg class="w-12 h-12 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+          </svg>
+          <p class="text-gray-500 mb-4">No cases yet</p>
+          <button
+            (click)="showNewForm.set(true)"
+            class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+            Create your first case
+          </button>
         </div>
       }
     </main>
   `
 })
-export class CasesComponent {
-  searchTerm = '';
-  statusFilter = '';
-  priorityFilter = '';
-  activeTab = signal<CaseTab>('active');
+export class CasesComponent implements OnInit {
+  private supabase = inject(SupabaseService);
+  private auth = inject(AuthService);
 
-  tabs = [
-    { id: 'active' as CaseTab, label: 'Active', icon: '🔄' },
-    { id: 'completed' as CaseTab, label: 'Completed', icon: '✅' },
-    { id: 'dropped' as CaseTab, label: 'Dropped', icon: '🗑️' }
-  ];
+  cases = signal<Case[]>([]);
+  loading = signal(true);
+  saving = signal(false);
+  error = signal<string | null>(null);
+  showNewForm = signal(false);
 
-  cases = signal<Case[]>([
-    { id: '1', caseNumber: 'CASE-20250128-0001', patientName: 'John Smith', carePlan: 'TeleNeurology', status: 'treating', priority: 'high', doi: '01/15/2025', createdAt: '2025-01-28', encounterCount: 4, lastActivity: '2 hours ago' },
-    { id: '2', caseNumber: 'CASE-20250128-0002', patientName: 'Maria Garcia', carePlan: 'DaylightRx', status: 'not_treating', priority: 'normal', doi: '01/20/2025', createdAt: '2025-01-28', encounterCount: 2, lastActivity: '1 day ago' },
-    { id: '3', caseNumber: 'CASE-20250127-0003', patientName: 'Robert Johnson', carePlan: 'VNS Therapy', status: 'treating', priority: 'urgent', doi: '12/10/2024', createdAt: '2025-01-27', encounterCount: 8, lastActivity: '30 min ago' },
-    { id: '4', caseNumber: 'CASE-20250126-0004', patientName: 'Sarah Williams', carePlan: 'RPM - mTBI', status: 'complete', priority: 'normal', doi: '11/05/2024', createdAt: '2025-01-26', encounterCount: 12, lastActivity: 'Jan 20, 2025' },
-    { id: '5', caseNumber: 'CASE-20250125-0005', patientName: 'Michael Brown', carePlan: 'Report Review', status: 'dropped', priority: 'low', doi: '01/02/2025', createdAt: '2025-01-25', encounterCount: 1, lastActivity: 'Jan 18, 2025' },
-    { id: '6', caseNumber: 'CASE-20250124-0006', patientName: 'Jennifer Davis', carePlan: 'TeleNeurology', status: 'pending_settlement', priority: 'normal', doi: '01/10/2025', createdAt: '2025-01-24', encounterCount: 6, lastActivity: '3 hours ago' },
-    { id: '7', caseNumber: 'CASE-20250123-0007', patientName: 'David Martinez', carePlan: 'VNS Therapy', status: 'treating', priority: 'high', doi: '12/28/2024', createdAt: '2025-01-23', encounterCount: 5, lastActivity: '1 day ago' },
-    { id: '8', caseNumber: 'CASE-20250122-0008', patientName: 'Emily Wilson', carePlan: 'DaylightRx', status: 'complete', priority: 'normal', doi: '01/05/2025', createdAt: '2025-01-22', encounterCount: 10, lastActivity: 'Jan 15, 2025' },
-    { id: '9', caseNumber: 'CASE-20250121-0009', patientName: 'Chris Anderson', carePlan: 'RPM - mTBI', status: 'dropped', priority: 'low', doi: '12/15/2024', createdAt: '2025-01-21', encounterCount: 3, lastActivity: 'Jan 10, 2025' },
-    { id: '10', caseNumber: 'CASE-20250120-0010', patientName: 'Lisa Thompson', carePlan: 'TeleNeurology', status: 'released', priority: 'normal', doi: '11/20/2024', createdAt: '2025-01-20', encounterCount: 7, lastActivity: '5 hours ago' }
-  ]);
+  newCase: NewCase = {
+    patient_first_name: '',
+    patient_last_name: '',
+    patient_email: '',
+    patient_phone: '',
+    patient_dob: '',
+    case_type: 'personal_injury',
+    incident_date: '',
+    priority: 'routine',
+    description: ''
+  };
 
-  filteredCases = computed(() => {
-    let result = this.cases();
-    const search = this.searchTerm.toLowerCase().trim();
-    const tab = this.activeTab();
+  ngOnInit() {
+    this.loadCases();
+  }
 
-    // Filter by tab
-    if (tab === 'active') {
-      result = result.filter(c => ['treating', 'not_treating', 'released', 'pending_settlement'].includes(c.status));
-    } else if (tab === 'completed') {
-      result = result.filter(c => c.status === 'complete');
-    } else if (tab === 'dropped') {
-      result = result.filter(c => c.status === 'dropped');
-    }
+  async loadCases() {
+    this.loading.set(true);
+    this.error.set(null);
 
-    // Filter by search
-    if (search) {
-      result = result.filter(c =>
-        c.patientName.toLowerCase().includes(search) ||
-        c.caseNumber.toLowerCase().includes(search) ||
-        c.carePlan.toLowerCase().includes(search)
-      );
-    }
+    try {
+      const { data, error } = await this.supabase.client
+        .from('cases')
+        .select(`
+          id,
+          case_number,
+          patient_id,
+          status,
+          priority,
+          incident_date,
+          case_type,
+          created_at,
+          patient:patients(id, first_name, last_name, email, phone)
+        `)
+        .order('created_at', { ascending: false });
 
-    // Filter by status (only for active tab)
-    if (this.statusFilter && tab === 'active') {
-      result = result.filter(c => c.status === this.statusFilter);
-    }
-
-    // Filter by priority
-    if (this.priorityFilter) {
-      result = result.filter(c => c.priority === this.priorityFilter);
-    }
-
-    return result;
-  });
-
-  getTabCount(tabId: CaseTab): number {
-    const cases = this.cases();
-    if (tabId === 'active') {
-      return cases.filter(c => ['treating', 'not_treating', 'released', 'pending_settlement'].includes(c.status)).length;
-    } else if (tabId === 'completed') {
-      return cases.filter(c => c.status === 'complete').length;
-    } else {
-      return cases.filter(c => c.status === 'dropped').length;
+      if (error) throw error;
+      this.cases.set(data || []);
+    } catch (err: any) {
+      this.error.set(err.message || 'Failed to load cases');
+      console.error('Error loading cases:', err);
+    } finally {
+      this.loading.set(false);
     }
   }
 
-  getTabClass(tabId: CaseTab): string {
-    const base = 'flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors';
-    if (this.activeTab() === tabId) {
-      return `${base} border-blue-600 text-blue-600 dark:text-blue-400`;
+  async createCase() {
+    if (!this.newCase.patient_first_name || !this.newCase.patient_last_name || !this.newCase.patient_dob) {
+      this.error.set('Please fill in required fields (First Name, Last Name, DOB)');
+      return;
     }
-    return `${base} border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300`;
-  }
 
-  getTabIconClass(tabId: CaseTab): string {
-    return 'text-lg';
-  }
+    this.saving.set(true);
+    this.error.set(null);
 
-  getTabCountClass(tabId: CaseTab): string {
-    const base = 'px-2 py-0.5 text-xs font-semibold rounded-full';
-    if (this.activeTab() === tabId) {
-      return `${base} bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-300`;
+    try {
+      const profile = this.auth.profile();
+      if (!profile?.organization_id) {
+        throw new Error('You must belong to an organization to create cases');
+      }
+
+      // First create the patient
+      const { data: patient, error: patientError } = await this.supabase.client
+        .from('patients')
+        .insert({
+          organization_id: profile.organization_id,
+          first_name: this.newCase.patient_first_name,
+          last_name: this.newCase.patient_last_name,
+          email: this.newCase.patient_email || null,
+          phone: this.newCase.patient_phone || null,
+          date_of_birth: this.newCase.patient_dob,
+          created_by: profile.id
+        })
+        .select()
+        .single();
+
+      if (patientError) throw patientError;
+
+      // Then create the case
+      const { data: newCase, error: caseError } = await this.supabase.client
+        .from('cases')
+        .insert({
+          organization_id: profile.organization_id,
+          patient_id: patient.id,
+          case_type: this.newCase.case_type,
+          incident_date: this.newCase.incident_date || null,
+          priority: this.newCase.priority,
+          description: this.newCase.description || null,
+          status: 'in-progress',
+          created_by: profile.id
+        })
+        .select(`
+          id,
+          case_number,
+          patient_id,
+          status,
+          priority,
+          incident_date,
+          case_type,
+          created_at,
+          patient:patients(id, first_name, last_name, email, phone)
+        `)
+        .single();
+
+      if (caseError) throw caseError;
+
+      // Add to list and reset form
+      this.cases.update(cases => [newCase, ...cases]);
+      this.resetNewCase();
+      this.showNewForm.set(false);
+
+    } catch (err: any) {
+      this.error.set(err.message || 'Failed to create case');
+      console.error('Error creating case:', err);
+    } finally {
+      this.saving.set(false);
     }
-    return `${base} bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400`;
   }
 
-  getStatusAccent(status: CaseStatus): string {
-    const base = 'w-1.5';
-    switch (status) {
-      case 'treating': return `${base} bg-gradient-to-b from-green-400 to-green-600`;
-      case 'not_treating': return `${base} bg-gradient-to-b from-amber-400 to-amber-600`;
-      case 'released': return `${base} bg-gradient-to-b from-blue-400 to-blue-600`;
-      case 'pending_settlement': return `${base} bg-gradient-to-b from-purple-400 to-purple-600`;
-      case 'complete': return `${base} bg-gradient-to-b from-teal-400 to-teal-600`;
-      case 'dropped': return `${base} bg-gradient-to-b from-red-400 to-red-600`;
-      default: return `${base} bg-gradient-to-b from-gray-400 to-gray-600`;
-    }
-  }
-
-  getStatusBadge(status: CaseStatus): string {
-    const base = 'px-2.5 py-1 text-xs font-medium rounded-full';
-    switch (status) {
-      case 'treating': return `${base} bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300`;
-      case 'not_treating': return `${base} bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300`;
-      case 'released': return `${base} bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300`;
-      case 'pending_settlement': return `${base} bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300`;
-      case 'complete': return `${base} bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300`;
-      case 'dropped': return `${base} bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300`;
-      default: return `${base} bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300`;
-    }
-  }
-
-  getStatusLabel(status: CaseStatus): string {
-    const labels: Record<CaseStatus, string> = {
-      treating: 'Treating',
-      not_treating: 'Not Treating',
-      released: 'Released',
-      pending_settlement: 'Pending Settlement',
-      complete: 'Complete',
-      dropped: 'Dropped'
+  resetNewCase() {
+    this.newCase = {
+      patient_first_name: '',
+      patient_last_name: '',
+      patient_email: '',
+      patient_phone: '',
+      patient_dob: '',
+      case_type: 'personal_injury',
+      incident_date: '',
+      priority: 'routine',
+      description: ''
     };
-    return labels[status] || status;
   }
 
-  getPriorityBadge(priority: string): string {
-    const base = 'px-2.5 py-1 text-xs font-medium rounded-full';
+  getPatientName(patient: Case['patient']): string {
+    if (!patient) return 'Unknown';
+    return `${patient.first_name || ''} ${patient.last_name || ''}`.trim() || 'Unknown';
+  }
+
+  getInitials(patient: Case['patient']): string {
+    if (!patient) return '?';
+    const first = patient.first_name?.charAt(0) || '';
+    const last = patient.last_name?.charAt(0) || '';
+    return (first + last).toUpperCase() || '?';
+  }
+
+  formatCaseType(type: string): string {
+    return type?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '';
+  }
+
+  formatDate(date: string): string {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  getStatusClass(status: string): string {
+    const base = 'px-2 py-1 text-xs font-medium rounded-full';
+    switch (status) {
+      case 'in-progress': return `${base} bg-blue-100 text-blue-700`;
+      case 'completed': return `${base} bg-green-100 text-green-700`;
+      case 'on-hold': return `${base} bg-amber-100 text-amber-700`;
+      case 'cancelled': return `${base} bg-red-100 text-red-700`;
+      default: return `${base} bg-gray-100 text-gray-700`;
+    }
+  }
+
+  getPriorityClass(priority: string): string {
+    const base = 'px-2 py-1 text-xs font-medium rounded-full';
     switch (priority) {
-      case 'urgent': return `${base} bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300`;
-      case 'high': return `${base} bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300`;
-      case 'normal': return `${base} bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300`;
-      case 'low': return `${base} bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300`;
-      default: return `${base} bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300`;
+      case 'stat': return `${base} bg-red-100 text-red-700`;
+      case 'urgent': return `${base} bg-orange-100 text-orange-700`;
+      case 'asap': return `${base} bg-amber-100 text-amber-700`;
+      default: return `${base} bg-gray-100 text-gray-600`;
     }
   }
 }
